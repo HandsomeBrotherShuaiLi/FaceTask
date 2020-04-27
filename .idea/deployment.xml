@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" serverName="ld-shuai_li@localhost:6000">
+    <serverData>
+      <paths name="ld-shuai_li@localhost:6000">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/data/shuai_li/FaceTask" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>
