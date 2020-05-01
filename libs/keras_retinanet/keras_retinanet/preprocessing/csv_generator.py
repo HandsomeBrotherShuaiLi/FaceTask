@@ -123,6 +123,8 @@ class CSVGenerator(Generator):
         csv_data_file,
         csv_class_file,
         base_dir=None,
+        height=None,
+        width=None,
         **kwargs
     ):
         """ Initialize a CSV data generator.
@@ -135,6 +137,8 @@ class CSVGenerator(Generator):
         self.image_names = []
         self.image_data  = {}
         self.base_dir    = base_dir
+        self.resized_h=height
+        self.resized_w=width
 
         # Take base_dir from annotations file if not explicitly specified.
         if self.base_dir is None:
@@ -200,11 +204,12 @@ class CSVGenerator(Generator):
         """ Compute the aspect ratio for an image with image_index.
         """
         # PIL is fast for metadata
-        # image = Image.open(self.image_path(image_index))
-        # return float(image.width) / float(image.height)
-
+        if self.resized_w and self.resized_h:
+            return self.resized_w/self.resized_h
+        else:
+            image = Image.open(self.image_path(image_index))
+            return float(image.width) / float(image.height)
         #change the shape of images to h=480,w=720
-        return 720/480
 
     def load_image(self, image_index):
         """ Load an image at the image_index.
@@ -212,8 +217,9 @@ class CSVGenerator(Generator):
         # return read_image_bgr(self.image_path(image_index))
         img=cv2.imread(self.image_path(image_index))
         img=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-        resized_img=cv2.resize(img,(720,480),interpolation=cv2.INTER_AREA)
-        return resized_img
+        if self.resized_h and self.resized_w:
+            img=cv2.resize(img,(self.resized_w,self.resized_h),interpolation=cv2.INTER_AREA)
+        return img
 
     def load_annotations(self, image_index):
         """ Load annotations for an image_index.

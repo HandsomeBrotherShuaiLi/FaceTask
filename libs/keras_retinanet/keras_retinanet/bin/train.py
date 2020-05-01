@@ -169,41 +169,44 @@ def create_callbacks(model, training_model, prediction_model, validation_generat
         else:
             evaluation = Evaluate(validation_generator, tensorboard=tensorboard_callback, weighted_average=args.weighted_average)
         evaluation = RedirectModel(evaluation, prediction_model)
+        print('callbacks append evaluation')
         callbacks.append(evaluation)
 
     # save the model
-    if args.snapshots:
-        # ensure directory created first; otherwise h5py will error after epoch.
-        makedirs(args.snapshot_path)
-        checkpoint = keras.callbacks.ModelCheckpoint(
-            os.path.join(
-                args.snapshot_path,
-                '{backbone}_{dataset_type}_{{epoch:02d}}.h5'.format(backbone=args.backbone, dataset_type=args.dataset_type)
-            ),
-            verbose=1,
-            save_best_only=True,
-            save_weights_only=False,
-            period=1,
-            monitor="mAP",
-            mode='max'
-        )
-        checkpoint = RedirectModel(checkpoint, model)
-        callbacks.append(checkpoint)
+    makedirs(args.snapshot_path)
+    checkpoint = keras.callbacks.ModelCheckpoint(
+        os.path.join(
+            args.snapshot_path,
+            'retinanet_{backbone}_{dataset_type}.h5'.format(backbone=args.backbone, dataset_type=args.dataset_type)
+        ),
+        verbose=1,
+        save_best_only=True,
+        save_weights_only=False,
+        period=1,
+        monitor='val_loss',
+        mode='min'
+        # monitor="mAP",
+        # mode='max'
+    )
+    checkpoint = RedirectModel(checkpoint, model)
+    callbacks.append(checkpoint)
+    print('callbacks append model checkpoints')
+
 
     callbacks.append(keras.callbacks.ReduceLROnPlateau(
-        monitor    = 'mAP',
+        monitor    = 'val_loss',
         factor     = 0.1,
         patience   = 6,
         verbose    = 1,
-        mode       = 'max',
+        mode       = 'min',
         min_delta  = 0.0001,
         cooldown   = 0,
         min_lr     = 0
     ))
 
     callbacks.append(keras.callbacks.EarlyStopping(
-        monitor='mAP',
-        mode='max',
+        monitor='val_loss',
+        mode='min',
         verbose=1,
         patience=40
     ))
@@ -295,6 +298,8 @@ def create_generators(args, preprocess_image):
             args.classes,
             transform_generator=transform_generator,
             visual_effect_generator=visual_effect_generator,
+            width=args.width,
+            height=args.height,
             **common_args
         )
 
@@ -303,6 +308,8 @@ def create_generators(args, preprocess_image):
                 args.val_annotations,
                 args.classes,
                 shuffle_groups=False,
+                width=args.width,
+                height=args.height,
                 **common_args
             )
         else:
@@ -413,9 +420,12 @@ def parse_args():
     parser.add_argument('--image-min-side',   help='Rescale the image so the smallest side is min_side.', type=int, default=800)
     parser.add_argument('--image-max-side',   help='Rescale the image if the largest side is larger than max_side.', type=int, default=1333)
     parser.add_argument('--no-resize',        help='Don''t rescale the image.', action='store_true')
+    parser.add_argument('--height',           default=480)
+    parser.add_argument('--width',            default=720)
     parser.add_argument('--config',           help='Path to a configuration parameters .ini file.')
     parser.add_argument('--weighted-average', help='Compute the mAP using the weighted average of precisions among classes.', action='store_true')
     parser.add_argument('--compute-val-loss', help='Compute validation loss during training', dest='compute_val_loss', action='store_true')
+
 
     # Fit generator arguments
     parser.add_argument('--multiprocessing',  help='Use multiprocessing in fit_generator.', action='store_true')
@@ -423,14 +433,15 @@ def parse_args():
     parser.add_argument('--max-queue-size',   help='Queue length for multiprocessing workers in fit_generator.', type=int, default=10)
 
     args=parser.parse_args()
-    args.dataset_type = 'csv'
 
     return check_args(args)
 
 
 def detection_main(args,train_steps=None,val_steps=None):
     # parse arguments
+    print('*'*100)
     print(args)
+    print('*'*100)
 
     # create object that stores backbone information
     backbone = models.backbone(args.backbone)

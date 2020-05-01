@@ -3,11 +3,19 @@ import cv2, tqdm
 
 # retinanet
 from libs.keras_retinanet.keras_retinanet.bin.train import *
+from libs.keras_retinanet.keras_retinanet import models
+from libs.keras_retinanet.keras_retinanet.utils.image import read_image_bgr,preprocess_image,resize_image
+from libs.keras_retinanet.keras_retinanet.utils.visualization import draw_box,draw_caption
+from libs.keras_retinanet.keras_retinanet.utils.gpu import setup_gpu
+from libs.keras_retinanet.keras_retinanet.utils.colors import label_color
+import matplotlib.pyplot as plt
 
 
 class Detection(object):
-    def __init__(self, img_dir, label_csv_path, split_rate=0.2, batch_size=32):
+    def __init__(self, img_dir, label_csv_path, split_rate=0.2, batch_size=32,
+                 resized_shape=(480, 720)):
         self.img_dir = img_dir
+        self.resized_shape = resized_shape
         self.label_csv_path = label_csv_path
         self.split_rate = split_rate
         self.batch_size = batch_size
@@ -15,16 +23,17 @@ class Detection(object):
         self.train_steps = len(open(self.train_path, 'r', encoding='utf-8').readlines()) // batch_size
         self.val_steps = len(open(self.val_path, 'r', encoding='utf-8').readlines()) // batch_size
 
-    def process(self, shape=(480, 720)):
+    def process(self):
+        shape = self.resized_shape
         os.makedirs('labels/detection/', exist_ok=True)
         os.makedirs('saved_models/detection', exist_ok=True)
-        if os.path.exists('labels/detection/anno_detection_train.csv') and os.path.exists(
-                'labels/detection/anno_detection_val.csv') and os.path.exists('labels/detection/detection_class.csv'):
-            return 'labels/detection/anno_detection_train.csv', 'labels/detection/anno_detection_val.csv', 'labels/detection/detection_class.csv'
+        if os.path.exists('labels/detection/anno_detection_train_{}x{}.csv'.format(shape[0],shape[1])) and os.path.exists(
+                'labels/detection/anno_detection_val_{}x{}.csv'.format(shape[0],shape[1])) and os.path.exists('labels/detection/detection_class.csv'):
+            return 'labels/detection/anno_detection_train_{}x{}.csv'.format(shape[0],shape[1]), 'labels/detection/anno_detection_val_{}x{}.csv'.format(shape[0],shape[1]), 'labels/detection/detection_class.csv'
         else:
             f = open(self.label_csv_path, 'r', encoding='utf-8').readlines()
-            train_writer = open('labels/detection/anno_detection_train.csv', 'w', encoding='utf-8')
-            val_writer = open('labels/detection/anno_detection_val.csv', 'w', encoding='utf-8')
+            train_writer = open('labels/detection/anno_detection_train_{}x{}.csv'.format(shape[0],shape[1]), 'w', encoding='utf-8')
+            val_writer = open('labels/detection/anno_detection_val_{}x{}.csv'.format(shape[0],shape[1]), 'w', encoding='utf-8')
             class_writer = open('labels/detection/detection_class.csv', 'w', encoding='utf-8')
             all_index = np.array(range(len(f)))
             val_index = np.random.choice(all_index, size=int(self.split_rate * len(f)), replace=False)
@@ -48,27 +57,105 @@ class Detection(object):
             class_writer.close()
             val_writer.close()
             train_writer.close()
-            return 'labels/detection/anno_detection_train.csv', 'labels/detection/anno_detection_val.csv', 'labels/detection/detection_class.csv'
+            return 'labels/detection/anno_detection_train_{}x{}.csv'.format(shape[0],shape[1]), 'labels/detection/anno_detection_val_{}x{}.csv'.format(shape[0],shape[1]), 'labels/detection/detection_class.csv'
 
-    def train_model(self, directly_train=True, backbone='resnet152', method='retinanet'):
+
+    def train_model(self, gpu=2,directly_train=True, backbone='resnet152', method='retinanet',
+                    model_path=None):
         if method == 'retinanet' and directly_train:
             args = parse_args()
             args.dataset_type = 'csv'
             args.batch_size = self.batch_size
             args.backbone = backbone
-            args.gpu = 3
+            args.gpu = gpu
             args.annotations = self.train_path
             args.classes = self.cls_path
             args.val_annotations = self.val_path
+            args.evaluation = True
             args.snapshot_path = 'saved_models/detection'
             args.random_transform = True
-            args.weighted_average = True
+            args.lr=1e-3
             args.no_resize=True
+            args.width=self.resized_shape[1]
+            args.height=self.resized_shape[0]
+            args.compute_val_loss = True
+            if model_path:
+                args.snapshot = model_path
             detection_main(args=args, train_steps=self.train_steps, val_steps=self.val_steps)
+
+    def prediction(self,directly_train=True,
+                   backbone='resnet50',
+                   method='retinanet',
+                   resized=True,
+                   preprocess=True,
+                   test_dir = 'data/personai_icartoonface_detval',
+                   model_path='/data/shuai_li/FaceTask/saved_models/detection/resnet50_csv_16.h5',
+                   show=False, write_prediction=True):
+        name=model_path.split('/')[-1].replace('.h5','_predictions.csv')
+        full_name=[method,name]
+        if directly_train:
+            full_name.append('directly-train')
+        if resized:
+            full_name.append('resized-by-myself')
+        if preprocess:
+            full_name.append('preprocessed')
+        if write_prediction:
+            result=open('predictions/{}.csv'.format('_'.join(full_name)),'w',encoding='utf-8')
+        if directly_train and method == 'retinanet':
+            gpu_id=0
+            setup_gpu(gpu_id)
+            model = models.load_model(model_path,backbone_name=backbone)
+            model = models.convert_model(model,nms=True,class_specific_filter=True)
+            model.summary()
+            label_to_name={0:'face'}
+            files = os.listdir(test_dir)
+            for img_name in tqdm.tqdm(files,total=len(files)):
+                img_path = os.path.join(test_dir,img_name)
+                image = cv2.imread(img_path)
+                original_shape = image.shape
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                draw = image.copy()
+                if resized:
+                    image = cv2.resize(image,(720,480),interpolation=cv2.INTER_AREA)
+                if preprocess:
+                    image = preprocess_image(image)
+                scale = 1
+                if not resized:
+                    image, scale = resize_image(image)
+                boxes,scores,labels = model.predict_on_batch(np.expand_dims(image,axis=0))
+                if not resized:
+                    boxes /= scale
+                if resized:
+                    h_rate = original_shape[0]/480
+                    w_rate = original_shape[1]/720
+                    boxes[:,0] *= w_rate
+                    boxes[:,2] *= w_rate
+                    boxes[:,1] *= h_rate
+                    boxes[:,3] *= h_rate
+                for box, score, label in zip(boxes[0], scores[0], labels[0]):
+                    if score < 0.5:
+                        break
+                    color = label_color(label)
+                    b = box.astype(int)
+                    if write_prediction:
+                        result.write('{},{},{},{},{},{},{}\n'.format(
+                            img_name,b[0],b[1],b[2],b[3],'face',score
+                        ))
+                    if show:
+                        draw_box(draw, b, color=color)
+                        caption = "{} {:.3f}".format(label_to_name[label], score)
+                        draw_caption(draw, b, caption)
+                if show:
+                    plt.figure(figsize=(15, 15))
+                    plt.axis('off')
+                    plt.imshow(draw)
+                    plt.show()
 
 
 if __name__ == '__main__':
+    # (240,360) (480,720) (512,768) (720,1080) multi-scale training
     app = Detection(img_dir='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain/icartoonface_dettrain',
-                    label_csv_path='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain/icartoonface_dettrain.csv',
-                    batch_size=10)
-    app.train_model(directly_train=True,backbone='resnet50')
+                    label_csv_path='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain_anno_updatedv1.0.csv',
+                    batch_size=10,resized_shape=(240,360))
+    app.train_model(gpu=1,directly_train=True,backbone='resnet152',method='retinanet',model_path=None)
+    # app.prediction(preprocess=True,resized=False,show=False,write_prediction=True)
