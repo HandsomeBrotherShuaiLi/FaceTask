@@ -199,7 +199,7 @@ class Segmentation(object):
     def predict(self,model_path,shape,
                 test_img_dir='data/personai_icartoonface_detval'):
         model = keras.models.load_model(model_path,compile=False)
-        os.makedirs('predictions',exist_ok=True)
+        os.makedirs('../predictions', exist_ok=True)
         files=os.listdir(test_img_dir)
         name=model_path.split('/')[-1].replace('.h5','_predictions.csv')
         result=open('predictions/{}'.format(name),'w',encoding='utf-8')
