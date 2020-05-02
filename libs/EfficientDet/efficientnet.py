@@ -38,8 +38,8 @@ from keras_applications.imagenet_utils import _obtain_input_shape
 from keras_applications.imagenet_utils import decode_predictions
 from keras_applications.imagenet_utils import preprocess_input as _preprocess_input
 
-from utils import get_submodules_from_kwargs
-from layers import BatchNormalization
+from libs.EfficientDet.utils import get_submodules_from_kwargs
+from libs.EfficientDet.layers import BatchNormalization
 
 backend = None
 layers = None

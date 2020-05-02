@@ -40,7 +40,7 @@ def setup_gpu(gpu_id):
                 print(e)
 
             logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            print('set GPU at {} {}'.format(gpu_id,logical_gpus))
     else:
         import os
         if gpu_id == 'cpu' or gpu_id == -1:

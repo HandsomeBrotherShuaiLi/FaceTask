@@ -1,20 +1,9 @@
 import os, cv2, tqdm
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 import keras, numpy as np
 from collections import defaultdict
-import tensorflow as tf
-import keras.backend.tensorflow_backend as KTF
-
-config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.3
-session = tf.Session(config=config)
-KTF.set_session(session)
 import segmentation_models as sm
 from keras.optimizers import Adam, Adadelta, SGD
-import keras.backend as K
-import matplotlib.pyplot as plt
-K.set_image_data_format('channels_last')
+
 
 from albumentations import (
     IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,PadIfNeeded,ElasticTransform,

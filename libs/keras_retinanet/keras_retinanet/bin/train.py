@@ -197,7 +197,7 @@ def create_callbacks(model, training_model, prediction_model, validation_generat
     callbacks.append(keras.callbacks.ReduceLROnPlateau(
         monitor    = 'val_loss',
         factor     = 0.1,
-        patience   = 6,
+        patience   = 4,
         verbose    = 1,
         mode       = 'min',
         min_delta  = 0.0001,
@@ -209,7 +209,7 @@ def create_callbacks(model, training_model, prediction_model, validation_generat
         monitor='val_loss',
         mode='min',
         verbose=1,
-        patience=40
+        patience=26,
     ))
 
     if args.tensorboard_dir:
@@ -455,8 +455,8 @@ def detection_main(args,train_steps=None,val_steps=None):
     # check_tf_version()
 
     # optionally choose specific GPU
-    if args.gpu is not None:
-        setup_gpu(args.gpu)
+    # if args.gpu is not None:
+    #     setup_gpu(args.gpu)
 
     # optionally load config parameters
     if args.config:

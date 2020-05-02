@@ -1,13 +1,15 @@
 import numpy as np
 import cv2, tqdm
-
+import keras.backend as K
+K.set_image_data_format('channels_last')
 # retinanet
 from libs.keras_retinanet.keras_retinanet.bin.train import *
 from libs.keras_retinanet.keras_retinanet import models
-from libs.keras_retinanet.keras_retinanet.utils.image import read_image_bgr, preprocess_image, resize_image
+from libs.keras_retinanet.keras_retinanet.utils.image import preprocess_image, resize_image
 from libs.keras_retinanet.keras_retinanet.utils.visualization import draw_box, draw_caption
 from libs.keras_retinanet.keras_retinanet.utils.gpu import setup_gpu
 from libs.keras_retinanet.keras_retinanet.utils.colors import label_color
+from libs.EfficientDet.train import efficientdet_train,efficientdet_parse_args
 from libs.segmentation import Segmentation
 import matplotlib.pyplot as plt
 
@@ -75,9 +77,16 @@ class Detection(object):
                 1]), 'labels/detection/anno_detection_val_{}x{}.csv'.format(shape[0], shape[
                 1]), 'labels/detection/detection_class.csv'
 
-    def train_model(self, gpu=2, directly_train=True, backbone='resnet152', method='retinanet',
+    def train_model(self, gpu=3, directly_train=True, backbone='resnet152', method='retinanet',
                     model_path=None, augmentation=True, gpu_fraction=0.3):
-        if method == 'retinanet' and directly_train and self.base.lower() == 'detection':
+        setup_gpu(gpu)
+        import tensorflow as tf
+        import keras.backend.tensorflow_backend as KTF
+        config = tf.ConfigProto()
+        config.gpu_options.per_process_gpu_memory_fraction = gpu_fraction
+        session = tf.Session(config=config)
+        KTF.set_session(session)
+        if method.lower() == 'retinanet' and directly_train and self.base.lower() == 'detection':
             args = parse_args()
             args.dataset_type = 'csv'
             args.batch_size = self.batch_size
@@ -95,19 +104,73 @@ class Detection(object):
             args.width = self.resized_shape[1]
             args.height = self.resized_shape[0]
             args.compute_val_loss = True
-            if model_path:
+            if model_path is None:
+                args.lr=1e-3
+                args.freeze_backbone = True
+                args.snapshot = None
+                args.weights = None
+                args.imagenet_weights = True
+                detection_main(args,train_steps=self.train_steps,val_steps=self.val_steps)
+
+                args.lr=1e-4
+                args.freeze_backbone = False
+                args.snapshot = '{dir}/retinanet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(dir=args.snapshot_path,
+                                                                                                          backbone=args.backbone,
+                                                                                                          dataset_type=args.dataset_type,
+                                                                                                          height=args.height,width=args.width)
+                detection_main(args,train_steps=self.train_steps,val_steps=self.val_steps)
+            else:
+                args.lr=1e-5
+                args.freeze_backbone = False
                 args.snapshot = model_path
-            detection_main(args=args, train_steps=self.train_steps, val_steps=self.val_steps)
+                detection_main(args,train_steps=self.train_steps,val_steps=self.val_steps)
+
+        elif method.lower() == 'efficientdet' and directly_train and self.base.lower() == 'detection':
+
+            args = efficientdet_parse_args()
+            args.dataset_type = 'csv'
+            args.batch_size = self.batch_size
+            args.backbone = 'efficientnet'
+            args.gpu = gpu
+            args.annotations_path = self.train_path
+            args.classes_path = self.cls_path
+            args.val_annotations_path = self.val_path
+            args.evaluation = False
+            args.snapshot_path = 'saved_models/detection'
+            args.detect_quadrangle = False
+            args.detect_text = False
+            args.no_resize = True
+            args.augmentation = augmentation
+            args.width = self.resized_shape[1]
+            args.height = self.resized_shape[0]
+            args.compute_val_loss = True
+            args.random_transform = True
+            args.phi = int(backbone[-1])
+            args.epochs = 300
+
+            if model_path is None:
+                #step-1:
+                args.lr=1e-3
+                args.freeze_backbone = True
+                args.snapshot = 'imagenet'
+                efficientdet_train(args,train_steps=self.train_steps,val_steps=self.val_steps)
+
+                #step-2
+                args.lr=1e-4
+                args.freeze_bn = True
+                args.snapshot = '{dir}/efficientdet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(dir=args.snapshot_path,
+                                                                                                          backbone=args.backbone,
+                                                                                                          dataset_type=args.dataset_type,
+                                                                                                          height=args.height,width=args.width)
+                efficientdet_train(args,train_steps=self.train_steps,val_steps=self.val_steps)
+
+            else:
+                args.lr=1e-5
+                args.freeze_bn = True
+                args.snapshot = model_path
+                efficientdet_train(args,train_steps=self.train_steps,val_steps=self.val_steps)
+
         elif self.base.lower() == 'segmentation':
-            setup_gpu(gpu)
-
-            import tensorflow as tf
-            import keras.backend.tensorflow_backend as KTF
-            config = tf.ConfigProto()
-            config.gpu_options.per_process_gpu_memory_fraction = gpu_fraction
-            session = tf.Session(config=config)
-            KTF.set_session(session)
-
             fine_tune = True if model_path else False
             self.app.train(model_name=method, backbone=backbone,
                            fine_tune=fine_tune, model_path=model_path,
@@ -195,7 +258,7 @@ if __name__ == '__main__':
     # (240,360) (480,720) (512,768) (720,1080) multi-scale training
     app = Detection(img_dir='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain/icartoonface_dettrain',
                     label_csv_path='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain_anno_updatedv1.0.csv',
-                    batch_size=10,resized_shape=(240,360))
-    app.train_model(gpu=2,directly_train=True,backbone='resnet152',method='retinanet',
-                    model_path=None,augmentation=False)#the last ms, use augmentation
+                    batch_size=10,resized_shape=(240,360),base='detection')
+    app.train_model(gpu=3,directly_train=True,method='efficientdet',backbone='b3',
+                    model_path=None,augmentation=False,gpu_fraction=0.3)#the last ms, use augmentation
     # app.prediction(preprocess=True,resized=False,show=False,write_prediction=True)

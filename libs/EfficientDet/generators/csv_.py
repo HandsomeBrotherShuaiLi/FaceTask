@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from generators.common import Generator
+from libs.EfficientDet.generators.common import Generator
 import cv2
 import numpy as np
 from PIL import Image
@@ -24,7 +24,12 @@ import csv
 import sys
 import os.path as osp
 from collections import OrderedDict
-
+from albumentations import (
+    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
+    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
+    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, RandomBrightnessContrast, IAAPiecewiseAffine,
+    IAASharpen, IAAEmboss, Flip, OneOf, Compose
+)
 
 def _parse(value, function, fmt):
     """
@@ -175,6 +180,9 @@ class CSVGenerator(Generator):
             csv_data_file,
             csv_class_file,
             base_dir=None,
+            resized_h=None,
+            resized_w=None,
+            with_aug=False,
             detect_quadrangle=False,
             detect_text=False,
             **kwargs
@@ -190,6 +198,9 @@ class CSVGenerator(Generator):
         """
         self.image_names = []
         self.image_data = {}
+        self.resized_h=resized_h
+        self.resized_w=resized_w
+        self.with_aug=with_aug
         self.base_dir = base_dir
         self.detect_quadrangle = detect_quadrangle
         self.detect_text = detect_text
@@ -276,8 +287,11 @@ class CSVGenerator(Generator):
         Compute the aspect ratio for an image with image_index.
         """
         # PIL is fast for metadata
-        image = Image.open(self.image_path(image_index))
-        return float(image.width) / float(image.height)
+        if self.resized_w and self.resized_h:
+            return self.resized_w/self.resized_h
+        else:
+            image = Image.open(self.image_path(image_index))
+            return float(image.width) / float(image.height)
 
     def load_image(self, image_index):
         """
@@ -285,6 +299,34 @@ class CSVGenerator(Generator):
         """
         image = cv2.imread(self.image_path(image_index))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        if self.with_aug:
+            aug=Compose([
+                OneOf([
+                    IAAAdditiveGaussianNoise(),
+                    GaussNoise(),
+                ], p=0.5),
+                OneOf([
+                    MotionBlur(p=.2),
+                    MedianBlur(blur_limit=3, p=0.1),
+                    Blur(blur_limit=3, p=0.1),
+                ], p=0.5),
+                OneOf([
+                    OpticalDistortion(p=0.3),
+                    GridDistortion(p=.1),
+                    IAAPiecewiseAffine(p=0.3),
+                ], p=0.5),
+                OneOf([
+                    CLAHE(clip_limit=2),
+                    IAASharpen(),
+                    IAAEmboss(),
+                    RandomBrightnessContrast(),
+                ], p=0.5),
+                HueSaturationValue(p=0.5),
+            ], p=0.5)
+            image = aug(image=image)['image']
+
+        if self.resized_h and self.resized_w:
+            image = cv2.resize(image,(self.resized_w,self.resized_h),interpolation=cv2.INTER_AREA)
         return image
 
     def load_annotations(self, image_index):

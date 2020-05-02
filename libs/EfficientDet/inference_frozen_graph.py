@@ -3,12 +3,12 @@ import numpy as np
 import cv2
 import os
 import time
-from utils import preprocess_image
+from libs.EfficientDet.utils import preprocess_image
 from tensorflow.python.platform import gfile
 
-from utils.anchors import anchors_for_shape
-from utils.draw_boxes import draw_boxes
-from utils.post_process_boxes import post_process_boxes
+from libs.EfficientDet.utils.anchors import anchors_for_shape
+from libs.EfficientDet.utils.draw_boxes import draw_boxes
+from libs.EfficientDet.utils import postprocess_boxes
 
 
 def get_frozen_graph(graph_file):
@@ -66,10 +66,8 @@ def main():
 
     boxes, scores, labels = np.squeeze(boxes), np.squeeze(scores), np.squeeze(labels)
     print(time.time() - start)
-    boxes = post_process_boxes(boxes=boxes,
+    boxes = postprocess_boxes(boxes=boxes,
                                scale=scale,
-                               offset_h=offset_h,
-                               offset_w=offset_w,
                                height=h,
                                width=w)
 

@@ -1,9 +1,9 @@
-from model import efficientdet
+from libs.EfficientDet.model import efficientdet
 import cv2
 import os
 import numpy as np
 import time
-from utils import preprocess_image
+from libs.EfficientDet.utils import preprocess_image
 import tensorflow as tf
 from tensorflow.keras import backend as K
 

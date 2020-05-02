@@ -24,7 +24,7 @@ import json
 from tqdm import trange
 import cv2
 
-from generators.coco import CocoGenerator
+from libs.EfficientDet.generators.coco import CocoGenerator
 
 
 def evaluate(generator, model, threshold=0.01):

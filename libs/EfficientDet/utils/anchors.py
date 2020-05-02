@@ -2,7 +2,7 @@
 import numpy as np
 from tensorflow import keras
 
-from utils.compute_overlap import compute_overlap
+from .compute_overlap import compute_overlap
 
 
 class AnchorParameters:

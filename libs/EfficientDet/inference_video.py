@@ -5,9 +5,9 @@ import os
 import time
 import glob
 
-from model import efficientdet
-from utils import preprocess_image, postprocess_boxes
-from utils.draw_boxes import draw_boxes
+from libs.EfficientDet.model import efficientdet
+from libs.EfficientDet.utils import preprocess_image, postprocess_boxes
+from libs.EfficientDet.utils.draw_boxes import draw_boxes
 
 
 def main():

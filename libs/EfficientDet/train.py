@@ -29,11 +29,11 @@ from tensorflow import keras
 import tensorflow.keras.backend as K
 from tensorflow.keras.optimizers import Adam, SGD
 
-from augmentor.color import VisualEffect
-from augmentor.misc import MiscEffect
-from model import efficientdet
-from losses import smooth_l1, focal, smooth_l1_quad
-from efficientnet import BASE_WEIGHTS_PATH, WEIGHTS_HASHES
+from .augmentor.color import VisualEffect
+from .augmentor.misc import MiscEffect
+from .model import efficientdet
+from .losses import smooth_l1, focal, smooth_l1_quad
+from .efficientnet import BASE_WEIGHTS_PATH, WEIGHTS_HASHES
 
 
 def makedirs(path):
@@ -92,42 +92,51 @@ def create_callbacks(training_model, prediction_model, validation_generator, arg
 
     if args.evaluation and validation_generator:
         if args.dataset_type == 'coco':
-            from eval.coco import Evaluate
+            from .eval.coco import Evaluate
             # use prediction model for evaluation
             evaluation = Evaluate(validation_generator, prediction_model, tensorboard=tensorboard_callback)
         else:
-            from eval.pascal import Evaluate
+            from .eval.pascal import Evaluate
             evaluation = Evaluate(validation_generator, prediction_model, tensorboard=tensorboard_callback)
         callbacks.append(evaluation)
 
     # save the model
-    if args.snapshots:
-        # ensure directory created first; otherwise h5py will error after epoch.
-        makedirs(args.snapshot_path)
-        checkpoint = keras.callbacks.ModelCheckpoint(
-            os.path.join(
-                args.snapshot_path,
-                f'{args.dataset_type}_{{epoch:02d}}_{{loss:.4f}}_{{val_loss:.4f}}.h5' if args.compute_val_loss
-                else f'{args.dataset_type}_{{epoch:02d}}_{{loss:.4f}}.h5'
-            ),
-            verbose=1,
-            save_weights_only=True,
-            # save_best_only=True,
-            # monitor="mAP",
-            # mode='max'
-        )
-        callbacks.append(checkpoint)
+    makedirs(args.snapshot_path)
+    checkpoint = keras.callbacks.ModelCheckpoint(
+        os.path.join(
+            args.snapshot_path,
+            'efficientdet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(backbone=args.backbone, dataset_type=args.dataset_type,
+                                                                             height=args.height,width=args.width)
+        ),
+        verbose=1,
+        save_weights_only=False,
+        save_best_only=True,
+        monitor='val_loss',
+        mode='min',
+        save_freq=1,
+        # save_best_only=True,
+        # monitor="mAP",
+        # mode='max'
+    )
+    callbacks.append(checkpoint)
+    print('append checkpoint')
 
-    # callbacks.append(keras.callbacks.ReduceLROnPlateau(
-    #     monitor='loss',
-    #     factor=0.1,
-    #     patience=2,
-    #     verbose=1,
-    #     mode='auto',
-    #     min_delta=0.0001,
-    #     cooldown=0,
-    #     min_lr=0
-    # ))
+
+    callbacks.append(keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.1,
+        patience=3,
+        verbose=1,
+        mode='auto',
+        min_delta=0.0001,
+    ))
+    print('append reducelronplateau')
+    callbacks.append(keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        verbose=1,patience=20,
+        mode='min',
+    ))
+    print('append earlystopping')
 
     return callbacks
 
@@ -156,7 +165,7 @@ def create_generators(args):
         visual_effect = None
 
     if args.dataset_type == 'pascal':
-        from generators.pascal import PascalVocGenerator
+        from .generators.pascal import PascalVocGenerator
         train_generator = PascalVocGenerator(
             args.pascal_path,
             'trainval',
@@ -174,12 +183,15 @@ def create_generators(args):
             **common_args
         )
     elif args.dataset_type == 'csv':
-        from generators.csv_ import CSVGenerator
+        from .generators.csv_ import CSVGenerator
         train_generator = CSVGenerator(
             args.annotations_path,
             args.classes_path,
             misc_effect=misc_effect,
             visual_effect=visual_effect,
+            resized_w=args.width,
+            resized_h=args.height,
+            with_aug=args.augmentation,
             **common_args
         )
 
@@ -188,13 +200,16 @@ def create_generators(args):
                 args.val_annotations_path,
                 args.classes_path,
                 shuffle_groups=False,
+                resized_w=args.width,
+                resized_h=args.height,
+                with_aug=False,
                 **common_args
             )
         else:
             validation_generator = None
     elif args.dataset_type == 'coco':
         # import here to prevent unnecessary dependency on cocoapi
-        from generators.coco import CocoGenerator
+        from .generators.coco import CocoGenerator
         train_generator = CocoGenerator(
             args.coco_path,
             'train2017',
@@ -234,29 +249,19 @@ def check_args(parsed_args):
             "Batch size ({}) must be equal to or higher than the number of GPUs ({})".format(parsed_args.batch_size,
                                                                                              len(parsed_args.gpu.split(
                                                                                                  ','))))
-
     return parsed_args
 
 
-def parse_args(args):
+def efficientdet_parse_args():
     """
     Parse the arguments.
     """
     today = str(date.today())
     parser = argparse.ArgumentParser(description='Simple training script for training a RetinaNet network.')
-    subparsers = parser.add_subparsers(help='Arguments for specific dataset types.', dest='dataset_type')
-    subparsers.required = True
 
-    coco_parser = subparsers.add_parser('coco')
-    coco_parser.add_argument('coco_path', help='Path to dataset directory (ie. /tmp/COCO).')
-
-    pascal_parser = subparsers.add_parser('pascal')
-    pascal_parser.add_argument('pascal_path', help='Path to dataset directory (ie. /tmp/VOCdevkit).')
-
-    csv_parser = subparsers.add_parser('csv')
-    csv_parser.add_argument('annotations_path', help='Path to CSV file containing annotations for training.')
-    csv_parser.add_argument('classes_path', help='Path to a CSV file containing class label mapping.')
-    csv_parser.add_argument('--val-annotations-path',
+    parser.add_argument('--annotations-path', help='Path to CSV file containing annotations for training.')
+    parser.add_argument('--classes-path', help='Path to a CSV file containing class label mapping.')
+    parser.add_argument('--val-annotations-path',
                             help='Path to CSV file containing annotations for validation (optional).')
     parser.add_argument('--detect-quadrangle', help='If to detect quadrangle.', action='store_true', default=False)
     parser.add_argument('--detect-text', help='If is text detection task.', action='store_true', default=False)
@@ -268,7 +273,7 @@ def parse_args(args):
 
     parser.add_argument('--batch-size', help='Size of the batches.', default=1, type=int)
     parser.add_argument('--phi', help='Hyper parameter phi', default=0, type=int, choices=(0, 1, 2, 3, 4, 5, 6))
-    parser.add_argument('--gpu', help='Id of the GPU to use (as reported by nvidia-smi).')
+    parser.add_argument('--gpu', help='Id of the GPU to use (as reported by nvidia-smi).',default=3)
     parser.add_argument('--epochs', help='Number of epochs to train.', type=int, default=50)
     parser.add_argument('--steps', help='Number of steps per epoch.', type=int, default=10000)
     parser.add_argument('--snapshot-path',
@@ -282,21 +287,24 @@ def parse_args(args):
     parser.add_argument('--random-transform', help='Randomly transform image and annotations.', action='store_true')
     parser.add_argument('--compute-val-loss', help='Compute validation loss during training', dest='compute_val_loss',
                         action='store_true')
+    parser.add_argument('--height',           default=480)
+    parser.add_argument('--width',            default=720)
+    parser.add_argument('--augmentation',     default=True)
 
     # Fit generator arguments
     parser.add_argument('--multiprocessing', help='Use multiprocessing in fit_generator.', action='store_true')
     parser.add_argument('--workers', help='Number of generator workers.', type=int, default=1)
     parser.add_argument('--max-queue-size', help='Queue length for multiprocessing workers in fit_generator.', type=int,
                         default=10)
-    print(vars(parser.parse_args(args)))
-    return check_args(parser.parse_args(args))
+    args = parser.parse_args()
+    return args
 
 
-def main(args=None):
+def efficientdet_train(args,train_steps=None,val_steps=None):
     # parse arguments
-    if args is None:
-        args = sys.argv[1:]
-    args = parse_args(args)
+    print('*'*100)
+    print(args)
+    print('*'*100)
 
     # create the generators
     train_generator, validation_generator = create_generators(args)
@@ -304,11 +312,6 @@ def main(args=None):
     num_classes = train_generator.num_classes()
     num_anchors = train_generator.num_anchors
 
-    # optionally choose specific GPU
-    if args.gpu:
-        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-
-    # K.set_session(get_session())
 
     model, prediction_model = efficientdet(args.phi,
                                            num_classes=num_classes,
@@ -338,16 +341,16 @@ def main(args=None):
         for i in range(1, [227, 329, 329, 374, 464, 566, 656][args.phi]):
             model.layers[i].trainable = False
 
-    if args.gpu and len(args.gpu.split(',')) > 1:
-        model = keras.utils.multi_gpu_model(model, gpus=list(map(int, args.gpu.split(','))))
+    # if args.gpu and len(str(args.gpu).split(',')) > 1:
+    #     model = keras.utils.multi_gpu_model(model, gpus=list(map(int, args.gpu.split(','))))
 
     # compile model
-    model.compile(optimizer=Adam(lr=1e-3), loss={
+    model.compile(optimizer=Adam(lr=args.lr), loss={
         'regression': smooth_l1_quad() if args.detect_quadrangle else smooth_l1(),
         'classification': focal()
     }, )
 
-    # print(model.summary())
+    model.summary()
 
     # create the callbacks
     callbacks = create_callbacks(
@@ -365,7 +368,7 @@ def main(args=None):
     # start training
     return model.fit_generator(
         generator=train_generator,
-        steps_per_epoch=args.steps,
+        steps_per_epoch=train_steps if train_steps else args.steps,
         initial_epoch=0,
         epochs=args.epochs,
         verbose=1,
@@ -373,9 +376,6 @@ def main(args=None):
         workers=args.workers,
         use_multiprocessing=args.multiprocessing,
         max_queue_size=args.max_queue_size,
-        validation_data=validation_generator
+        validation_data=validation_generator,
+        validation_steps=val_steps,
     )
-
-
-if __name__ == '__main__':
-    main()

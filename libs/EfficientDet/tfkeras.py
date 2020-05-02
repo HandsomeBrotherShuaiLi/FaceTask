@@ -1,5 +1,5 @@
 from .utils import inject_tfkeras_modules, init_tfkeras_custom_objects
-import efficientnet as model
+import libs.EfficientDet.efficientnet as model
 
 EfficientNetB0 = inject_tfkeras_modules(model.EfficientNetB0)
 EfficientNetB1 = inject_tfkeras_modules(model.EfficientNetB1)

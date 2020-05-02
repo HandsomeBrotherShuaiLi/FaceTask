@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from generators.common import Generator
+from libs.EfficientDet.generators.common import Generator
 import os
 import numpy as np
 from pycocotools.coco import COCO
