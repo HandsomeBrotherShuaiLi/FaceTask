@@ -26,7 +26,7 @@ import tensorflow as tf
 # from keras.optimizers import Adam, SGD
 
 from tensorflow import keras
-import tensorflow.keras.backend as K
+
 from tensorflow.keras.optimizers import Adam, SGD
 
 from .augmentor.color import VisualEffect
@@ -103,13 +103,13 @@ def create_callbacks(training_model, prediction_model, validation_generator, arg
     # save the model
     makedirs(args.snapshot_path)
     checkpoint = keras.callbacks.ModelCheckpoint(
-        os.path.join(
+        filepath=os.path.join(
             args.snapshot_path,
             'efficientdet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(backbone=args.backbone, dataset_type=args.dataset_type,
                                                                              height=args.height,width=args.width)
         ),
         verbose=1,
-        save_weights_only=False,
+        save_weights_only=True,
         save_best_only=True,
         monitor='val_loss',
         mode='min',
@@ -196,6 +196,7 @@ def create_generators(args):
         )
 
         if args.val_annotations_path:
+            print(args.val_annotations_path)
             validation_generator = CSVGenerator(
                 args.val_annotations_path,
                 args.classes_path,

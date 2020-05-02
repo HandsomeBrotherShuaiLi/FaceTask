@@ -130,7 +130,7 @@ class Detection(object):
             args = efficientdet_parse_args()
             args.dataset_type = 'csv'
             args.batch_size = self.batch_size
-            args.backbone = 'efficientnet'
+            args.backbone = backbone
             args.gpu = gpu
             args.annotations_path = self.train_path
             args.classes_path = self.cls_path
@@ -259,6 +259,6 @@ if __name__ == '__main__':
     app = Detection(img_dir='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain/icartoonface_dettrain',
                     label_csv_path='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain_anno_updatedv1.0.csv',
                     batch_size=10,resized_shape=(240,360),base='detection')
-    app.train_model(gpu=3,directly_train=True,method='efficientdet',backbone='b3',
-                    model_path=None,augmentation=False,gpu_fraction=0.3)#the last ms, use augmentation
+    app.train_model(gpu=3,directly_train=True,method='retinanet',backbone='resnet152',
+                    model_path=None,augmentation=False,gpu_fraction=0.2)#the last ms, use augmentation
     # app.prediction(preprocess=True,resized=False,show=False,write_prediction=True)

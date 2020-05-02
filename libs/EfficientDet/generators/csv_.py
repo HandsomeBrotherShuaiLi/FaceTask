@@ -304,25 +304,25 @@ class CSVGenerator(Generator):
                 OneOf([
                     IAAAdditiveGaussianNoise(),
                     GaussNoise(),
-                ], p=0.5),
+                ], p=0.2),
                 OneOf([
                     MotionBlur(p=.2),
                     MedianBlur(blur_limit=3, p=0.1),
                     Blur(blur_limit=3, p=0.1),
-                ], p=0.5),
+                ], p=0.2),
                 OneOf([
                     OpticalDistortion(p=0.3),
                     GridDistortion(p=.1),
                     IAAPiecewiseAffine(p=0.3),
-                ], p=0.5),
+                ], p=0.2),
                 OneOf([
                     CLAHE(clip_limit=2),
                     IAASharpen(),
                     IAAEmboss(),
                     RandomBrightnessContrast(),
-                ], p=0.5),
+                ], p=0.2),
                 HueSaturationValue(p=0.5),
-            ], p=0.5)
+            ], p=0.7)
             image = aug(image=image)['image']
 
         if self.resized_h and self.resized_w:
