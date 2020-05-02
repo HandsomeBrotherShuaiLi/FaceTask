@@ -27,7 +27,12 @@ import sys
 import cv2
 import os.path
 from collections import OrderedDict
-
+from albumentations import (
+    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
+    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
+    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, RandomBrightnessContrast, IAAPiecewiseAffine,
+    IAASharpen, IAAEmboss, Flip, OneOf, Compose
+)
 
 def _parse(value, function, fmt):
     """
@@ -125,6 +130,7 @@ class CSVGenerator(Generator):
         base_dir=None,
         height=None,
         width=None,
+        with_aug=True,
         **kwargs
     ):
         """ Initialize a CSV data generator.
@@ -139,6 +145,7 @@ class CSVGenerator(Generator):
         self.base_dir    = base_dir
         self.resized_h=height
         self.resized_w=width
+        self.with_aug=with_aug
 
         # Take base_dir from annotations file if not explicitly specified.
         if self.base_dir is None:
@@ -217,6 +224,32 @@ class CSVGenerator(Generator):
         # return read_image_bgr(self.image_path(image_index))
         img=cv2.imread(self.image_path(image_index))
         img=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+        if self.with_aug:
+            aug=Compose([
+                OneOf([
+                    IAAAdditiveGaussianNoise(),
+                    GaussNoise(),
+                ], p=0.5),
+                OneOf([
+                    MotionBlur(p=.2),
+                    MedianBlur(blur_limit=3, p=0.1),
+                    Blur(blur_limit=3, p=0.1),
+                ], p=0.5),
+                OneOf([
+                    OpticalDistortion(p=0.3),
+                    GridDistortion(p=.1),
+                    IAAPiecewiseAffine(p=0.3),
+                ], p=0.5),
+                OneOf([
+                    CLAHE(clip_limit=2),
+                    IAASharpen(),
+                    IAAEmboss(),
+                    RandomBrightnessContrast(),
+                ], p=0.5),
+                HueSaturationValue(p=0.5),
+            ], p=0.5)
+            img = aug(image=img)['image']
+
         if self.resized_h and self.resized_w:
             img=cv2.resize(img,(self.resized_w,self.resized_h),interpolation=cv2.INTER_AREA)
         return img

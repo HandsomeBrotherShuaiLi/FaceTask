@@ -61,7 +61,7 @@ class Detection(object):
 
 
     def train_model(self, gpu=2,directly_train=True, backbone='resnet152', method='retinanet',
-                    model_path=None):
+                    model_path=None,augmentation=True):
         if method == 'retinanet' and directly_train:
             args = parse_args()
             args.dataset_type = 'csv'
@@ -71,11 +71,12 @@ class Detection(object):
             args.annotations = self.train_path
             args.classes = self.cls_path
             args.val_annotations = self.val_path
-            args.evaluation = True
+            args.evaluation = False
             args.snapshot_path = 'saved_models/detection'
             args.random_transform = True
             args.lr=1e-3
             args.no_resize=True
+            args.augmentation=augmentation
             args.width=self.resized_shape[1]
             args.height=self.resized_shape[0]
             args.compute_val_loss = True
@@ -157,5 +158,6 @@ if __name__ == '__main__':
     app = Detection(img_dir='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain/icartoonface_dettrain',
                     label_csv_path='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain_anno_updatedv1.0.csv',
                     batch_size=10,resized_shape=(240,360))
-    app.train_model(gpu=1,directly_train=True,backbone='resnet152',method='retinanet',model_path=None)
+    app.train_model(gpu=2,directly_train=True,backbone='resnet152',method='retinanet',
+                    model_path=None,augmentation=False)#the last ms, use augmentation
     # app.prediction(preprocess=True,resized=False,show=False,write_prediction=True)

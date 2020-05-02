@@ -177,7 +177,8 @@ def create_callbacks(model, training_model, prediction_model, validation_generat
     checkpoint = keras.callbacks.ModelCheckpoint(
         os.path.join(
             args.snapshot_path,
-            'retinanet_{backbone}_{dataset_type}.h5'.format(backbone=args.backbone, dataset_type=args.dataset_type)
+            'retinanet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(backbone=args.backbone, dataset_type=args.dataset_type,
+                                                                             height=args.height,width=args.width)
         ),
         verbose=1,
         save_best_only=True,
@@ -300,6 +301,7 @@ def create_generators(args, preprocess_image):
             visual_effect_generator=visual_effect_generator,
             width=args.width,
             height=args.height,
+            with_aug=args.augmentation,
             **common_args
         )
 
@@ -310,6 +312,7 @@ def create_generators(args, preprocess_image):
                 shuffle_groups=False,
                 width=args.width,
                 height=args.height,
+                with_aug=False,
                 **common_args
             )
         else:
@@ -422,6 +425,7 @@ def parse_args():
     parser.add_argument('--no-resize',        help='Don''t rescale the image.', action='store_true')
     parser.add_argument('--height',           default=480)
     parser.add_argument('--width',            default=720)
+    parser.add_argument('--augmentation',     default=True)
     parser.add_argument('--config',           help='Path to a configuration parameters .ini file.')
     parser.add_argument('--weighted-average', help='Compute the mAP using the weighted average of precisions among classes.', action='store_true')
     parser.add_argument('--compute-val-loss', help='Compute validation loss during training', dest='compute_val_loss', action='store_true')
