@@ -21,12 +21,11 @@ import sys
 import tensorflow as tf
 
 # import keras
-# import keras.preprocessing.image
+# # import keras.preprocessing.image
 # import keras.backend as K
 # from keras.optimizers import Adam, SGD
 
 from tensorflow import keras
-
 from tensorflow.keras.optimizers import Adam, SGD
 
 from .augmentor.color import VisualEffect
@@ -47,13 +46,13 @@ def makedirs(path):
             raise
 
 
-def get_session():
-    """
-    Construct a modified tf session.
-    """
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    return tf.Session(config=config)
+# def get_session():
+#     """
+#     Construct a modified tf session.
+#     """
+#     config = tf.ConfigProto()
+#     config.gpu_options.allow_growth = True
+#     return tf.Session(config=config)
 
 
 def create_callbacks(training_model, prediction_model, validation_generator, args):
@@ -73,22 +72,14 @@ def create_callbacks(training_model, prediction_model, validation_generator, arg
 
     tensorboard_callback = None
 
-    if args.tensorboard_dir:
-        if tf.version.VERSION > '2.0.0':
-            file_writer = tf.summary.create_file_writer(args.tensorboard_dir)
-            file_writer.set_as_default()
-        tensorboard_callback = keras.callbacks.TensorBoard(
-            log_dir=args.tensorboard_dir,
-            histogram_freq=0,
-            batch_size=args.batch_size,
-            write_graph=True,
-            write_grads=False,
-            write_images=False,
-            embeddings_freq=0,
-            embeddings_layer_names=None,
-            embeddings_metadata=None
-        )
-        callbacks.append(tensorboard_callback)
+    # if args.tensorboard_dir:
+    #     # if tf.version.VERSION > '2.0.0':
+    #     #     file_writer = tf.summary.create_file_writer(args.tensorboard_dir)
+    #     #     file_writer.set_as_default()
+    #     tensorboard_callback = keras.callbacks.TensorBoard(
+    #         log_dir=args.tensorboard_dir
+    #     )
+    #     callbacks.append(tensorboard_callback)
 
     if args.evaluation and validation_generator:
         if args.dataset_type == 'coco':
@@ -105,15 +96,14 @@ def create_callbacks(training_model, prediction_model, validation_generator, arg
     checkpoint = keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(
             args.snapshot_path,
-            'efficientdet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(backbone=args.backbone, dataset_type=args.dataset_type,
-                                                                             height=args.height,width=args.width)
+            f'efficientdet_{args.backbone}_{args.dataset_type}_{args.height}x{args.width}_{{epoch:04d}}_{{val_loss:.5f}}.h5'
         ),
         verbose=1,
-        save_weights_only=True,
-        save_best_only=True,
+        save_weights_only=False,
+        # save_best_only=True,
         monitor='val_loss',
         mode='min',
-        save_freq=1,
+        # save_freq=1,
         # save_best_only=True,
         # monitor="mAP",
         # mode='max'
@@ -306,6 +296,28 @@ def efficientdet_train(args,train_steps=None,val_steps=None):
     print('*'*100)
     print(args)
     print('*'*100)
+    def make_sure_only_save_best():
+        dir = args.snapshot_path
+        scores = {}
+        min_loss = 10000000
+        prefix= f'efficientdet_{args.backbone}_{args.dataset_type}_{args.height}x{args.width}'
+        for name in os.listdir(dir):
+            if name.startswith(prefix):
+                cur_loss=float(name.strip('.h5').split('_')[-1])
+                scores[os.path.join(dir,name)]=cur_loss
+                if cur_loss < min_loss:
+                    min_loss = cur_loss
+        keys = sorted(scores)
+        flag = True
+        for k in keys:
+            if scores[k] > min_loss:
+                os.remove(k)
+            if scores[k] == min_loss:
+                if flag:
+                    flag = False
+                    print('only saved this model:{}'.format(k))
+                else:
+                    os.remove(k)
 
     # create the generators
     train_generator, validation_generator = create_generators(args)
@@ -351,7 +363,7 @@ def efficientdet_train(args,train_steps=None,val_steps=None):
         'classification': focal()
     }, )
 
-    model.summary()
+    # model.summary()
 
     # create the callbacks
     callbacks = create_callbacks(
@@ -367,7 +379,9 @@ def efficientdet_train(args,train_steps=None,val_steps=None):
         raise ValueError('When you have no validation data, you should not specify --compute-val-loss.')
 
     # start training
-    return model.fit_generator(
+    if validation_generator is None:
+        raise EnvironmentError
+    his = model.fit_generator(
         generator=train_generator,
         steps_per_epoch=train_steps if train_steps else args.steps,
         initial_epoch=0,
@@ -380,3 +394,5 @@ def efficientdet_train(args,train_steps=None,val_steps=None):
         validation_data=validation_generator,
         validation_steps=val_steps,
     )
+    print(his.history)
+    make_sure_only_save_best()

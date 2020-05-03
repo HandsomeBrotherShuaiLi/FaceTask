@@ -1,6 +1,7 @@
 import numpy as np
 import cv2, tqdm
 import keras.backend as K
+from PIL import Image
 K.set_image_data_format('channels_last')
 # retinanet
 from libs.keras_retinanet.keras_retinanet.bin.train import *
@@ -56,8 +57,14 @@ class Detection(object):
             for idx, line in tqdm.tqdm(enumerate(f), total=len(f)):
                 line = line.strip('\n').split(',')
                 img_path = os.path.join(self.img_dir, line[0])
-                img = cv2.imread(img_path)
-                original_h, original_w = img.shape[:2]
+                img = None
+                try:
+                    img = Image.open(img_path)
+                except Exception as E:
+                    print(E)
+                if img is None:
+                    continue
+                original_w, original_h = img.size
                 h_rate = shape[0] / original_h
                 w_rate = shape[1] / original_w
                 line[1], line[3] = int(int(line[1]) * w_rate), int(int(line[3]) * w_rate)
@@ -110,10 +117,12 @@ class Detection(object):
                 args.snapshot = None
                 args.weights = None
                 args.imagenet_weights = True
+                args.epochs = 50
                 detection_main(args,train_steps=self.train_steps,val_steps=self.val_steps)
 
                 args.lr=1e-4
                 args.freeze_backbone = False
+                args.epochs = 100
                 args.snapshot = '{dir}/retinanet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(dir=args.snapshot_path,
                                                                                                           backbone=args.backbone,
                                                                                                           dataset_type=args.dataset_type,
@@ -121,6 +130,7 @@ class Detection(object):
                 detection_main(args,train_steps=self.train_steps,val_steps=self.val_steps)
             else:
                 args.lr=1e-5
+                args.epochs = 100
                 args.freeze_backbone = False
                 args.snapshot = model_path
                 detection_main(args,train_steps=self.train_steps,val_steps=self.val_steps)
@@ -146,18 +156,19 @@ class Detection(object):
             args.compute_val_loss = True
             args.random_transform = True
             args.phi = int(backbone[-1])
-            args.epochs = 300
 
             if model_path is None:
                 #step-1:
                 args.lr=1e-3
                 args.freeze_backbone = True
                 args.snapshot = 'imagenet'
+                args.epochs = 50
                 efficientdet_train(args,train_steps=self.train_steps,val_steps=self.val_steps)
 
                 #step-2
                 args.lr=1e-4
                 args.freeze_bn = True
+                args.epochs = 100
                 args.snapshot = '{dir}/efficientdet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(dir=args.snapshot_path,
                                                                                                           backbone=args.backbone,
                                                                                                           dataset_type=args.dataset_type,
@@ -167,6 +178,7 @@ class Detection(object):
             else:
                 args.lr=1e-5
                 args.freeze_bn = True
+                args.epochs = 100
                 args.snapshot = model_path
                 efficientdet_train(args,train_steps=self.train_steps,val_steps=self.val_steps)
 
@@ -259,6 +271,6 @@ if __name__ == '__main__':
     app = Detection(img_dir='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain/icartoonface_dettrain',
                     label_csv_path='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain_anno_updatedv1.0.csv',
                     batch_size=10,resized_shape=(240,360),base='detection')
-    app.train_model(gpu=3,directly_train=True,method='retinanet',backbone='resnet152',
+    app.train_model(gpu=0,directly_train=True,method='efficientdet',backbone='b2',
                     model_path=None,augmentation=False,gpu_fraction=0.2)#the last ms, use augmentation
     # app.prediction(preprocess=True,resized=False,show=False,write_prediction=True)

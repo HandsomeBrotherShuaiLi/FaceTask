@@ -3,8 +3,8 @@ from functools import reduce
 # from keras import layers
 # from keras import initializers
 # from keras import models
-# from keras_ import EfficientNetB0, EfficientNetB1, EfficientNetB2
-# from keras_ import EfficientNetB3, EfficientNetB4, EfficientNetB5, EfficientNetB6
+# from .keras_ import EfficientNetB0, EfficientNetB1, EfficientNetB2
+# from .keras_ import EfficientNetB3, EfficientNetB4, EfficientNetB5, EfficientNetB6
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -46,7 +46,7 @@ def ConvBlock(num_channels, kernel_size, strides, name, freeze_bn=False):
     return reduce(lambda f, g: lambda *args, **kwargs: g(f(*args, **kwargs)), (f1, f2, f3))
 
 
-def build_wBiFPN(features, num_channels, id, freeze_bn=False):
+def build_wBiFPN(features, num_channels, id, freeze_bn=False, tf=None):
     if id == 0:
         _, _, C3, C4, C5 = features
         P3_in = C3

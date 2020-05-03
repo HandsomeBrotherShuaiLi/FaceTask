@@ -226,38 +226,3 @@ class MiscEffect:
         image, annotations = crop(image, annotations, prob=self.crop_prob)
         image, annotations = translate(image, annotations, prob=self.translate_prob, border_value=self.border_value)
         return image, annotations
-
-
-if __name__ == '__main__':
-    from generators.csv_ import CSVGenerator
-
-    train_generator = CSVGenerator('datasets/ic15/train.csv',
-                                   'datasets/ic15/classes.csv',
-                                   detect_text=True,
-                                   batch_size=1,
-                                   phi=5,
-                                   shuffle_groups=False)
-    misc_effect = MiscEffect()
-    for i in range(train_generator.size()):
-        image = train_generator.load_image(i)
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        annotations = train_generator.load_annotations(i)
-        boxes = annotations['bboxes'].astype(np.int32)
-        quadrangles = annotations['quadrangles'].astype(np.int32)
-        for box in boxes:
-            cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (0, 0, 255), 1)
-        cv2.drawContours(image, quadrangles, -1, (0, 255, 255), 1)
-        src_image = image.copy()
-        # cv2.namedWindow('src_image', cv2.WINDOW_NORMAL)
-        cv2.imshow('src_image', src_image)
-        # image, annotations = misc_effect(image, annotations)
-        image, annotations = multi_scale(image, annotations, prob=1.)
-        image = image.copy()
-        boxes = annotations['bboxes'].astype(np.int32)
-        quadrangles = annotations['quadrangles'].astype(np.int32)
-        for box in boxes:
-            cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 1)
-        cv2.drawContours(image, quadrangles, -1, (255, 255, 0), 1)
-        cv2.namedWindow('image', cv2.WINDOW_NORMAL)
-        cv2.imshow('image', image)
-        cv2.waitKey(0)
