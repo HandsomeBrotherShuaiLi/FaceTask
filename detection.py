@@ -1,8 +1,12 @@
 import numpy as np
 import cv2, tqdm
-import keras.backend as K
-from PIL import Image
+import tensorflow.keras.backend as K
 K.set_image_data_format('channels_last')
+
+import keras.backend as K
+K.set_image_data_format('channels_last')
+
+from PIL import Image
 # retinanet
 from libs.keras_retinanet.keras_retinanet.bin.train import *
 from libs.keras_retinanet.keras_retinanet import models
@@ -10,7 +14,7 @@ from libs.keras_retinanet.keras_retinanet.utils.image import preprocess_image, r
 from libs.keras_retinanet.keras_retinanet.utils.visualization import draw_box, draw_caption
 from libs.keras_retinanet.keras_retinanet.utils.gpu import setup_gpu
 from libs.keras_retinanet.keras_retinanet.utils.colors import label_color
-from libs.EfficientDet.train import efficientdet_train,efficientdet_parse_args
+from libs.EfficientDet.train import efficientdet_train, efficientdet_parse_args
 from libs.segmentation import Segmentation
 import matplotlib.pyplot as plt
 
@@ -18,6 +22,15 @@ import matplotlib.pyplot as plt
 class Detection(object):
     def __init__(self, img_dir, label_csv_path, split_rate=0.2, batch_size=32,
                  resized_shape=(480, 720), base='detection'):
+        """
+
+        :param img_dir:
+        :param label_csv_path:
+        :param split_rate:
+        :param batch_size:
+        :param resized_shape:
+        :param base:
+        """
         self.img_dir = img_dir
         self.resized_shape = resized_shape
         self.label_csv_path = label_csv_path
@@ -35,6 +48,10 @@ class Detection(object):
                                     shrink=True, use_aug=False)
 
     def process(self):
+        """
+
+        :return:
+        """
         shape = self.resized_shape
         os.makedirs('labels/detection/', exist_ok=True)
         os.makedirs('saved_models/detection', exist_ok=True)
@@ -86,6 +103,18 @@ class Detection(object):
 
     def train_model(self, gpu=3, directly_train=True, backbone='resnet152', method='retinanet',
                     model_path=None, augmentation=True, gpu_fraction=0.3):
+        """
+
+        :param gpu:
+        :param directly_train:
+        :param backbone:
+        :param method:
+        :param model_path:
+        :param augmentation:
+        :param gpu_fraction:
+        :return:
+        """
+
         setup_gpu(gpu)
         import tensorflow as tf
         import keras.backend.tensorflow_backend as KTF
@@ -112,28 +141,29 @@ class Detection(object):
             args.height = self.resized_shape[0]
             args.compute_val_loss = True
             if model_path is None:
-                args.lr=1e-3
-                args.freeze_backbone = True
-                args.snapshot = None
-                args.weights = None
-                args.imagenet_weights = True
-                args.epochs = 50
-                detection_main(args,train_steps=self.train_steps,val_steps=self.val_steps)
+                # args.lr = 1e-3
+                # args.freeze_backbone = True
+                # args.snapshot = None
+                # args.weights = None
+                # args.imagenet_weights = True
+                # args.epochs = 50
+                # detection_main(args, train_steps=self.train_steps, val_steps=self.val_steps)
 
-                args.lr=1e-4
+                args.lr = 1e-4
                 args.freeze_backbone = False
                 args.epochs = 100
-                args.snapshot = '{dir}/retinanet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(dir=args.snapshot_path,
-                                                                                                          backbone=args.backbone,
-                                                                                                          dataset_type=args.dataset_type,
-                                                                                                          height=args.height,width=args.width)
-                detection_main(args,train_steps=self.train_steps,val_steps=self.val_steps)
+                args.snapshot = '{dir}/retinanet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(
+                    dir=args.snapshot_path,
+                    backbone=args.backbone,
+                    dataset_type=args.dataset_type,
+                    height=args.height, width=args.width)
+                detection_main(args, train_steps=self.train_steps, val_steps=self.val_steps)
             else:
-                args.lr=1e-5
+                args.lr = 1e-5
                 args.epochs = 100
                 args.freeze_backbone = False
                 args.snapshot = model_path
-                detection_main(args,train_steps=self.train_steps,val_steps=self.val_steps)
+                detection_main(args, train_steps=self.train_steps, val_steps=self.val_steps)
 
         elif method.lower() == 'efficientdet' and directly_train and self.base.lower() == 'detection':
 
@@ -158,29 +188,30 @@ class Detection(object):
             args.phi = int(backbone[-1])
 
             if model_path is None:
-                #step-1:
-                args.lr=1e-3
+                # step-1:
+                args.lr = 1e-3
                 args.freeze_backbone = True
                 args.snapshot = 'imagenet'
                 args.epochs = 50
-                efficientdet_train(args,train_steps=self.train_steps,val_steps=self.val_steps)
+                efficientdet_train(args, train_steps=self.train_steps, val_steps=self.val_steps)
 
-                #step-2
-                args.lr=1e-4
+                # step-2
+                args.lr = 1e-4
                 args.freeze_bn = True
                 args.epochs = 100
-                args.snapshot = '{dir}/efficientdet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(dir=args.snapshot_path,
-                                                                                                          backbone=args.backbone,
-                                                                                                          dataset_type=args.dataset_type,
-                                                                                                          height=args.height,width=args.width)
-                efficientdet_train(args,train_steps=self.train_steps,val_steps=self.val_steps)
+                args.snapshot = '{dir}/efficientdet_{backbone}_{dataset_type}_{height}x{width}.h5'.format(
+                    dir=args.snapshot_path,
+                    backbone=args.backbone,
+                    dataset_type=args.dataset_type,
+                    height=args.height, width=args.width)
+                efficientdet_train(args, train_steps=self.train_steps, val_steps=self.val_steps)
 
             else:
-                args.lr=1e-5
+                args.lr = 1e-5
                 args.freeze_bn = True
                 args.epochs = 100
                 args.snapshot = model_path
-                efficientdet_train(args,train_steps=self.train_steps,val_steps=self.val_steps)
+                efficientdet_train(args, train_steps=self.train_steps, val_steps=self.val_steps)
 
         elif self.base.lower() == 'segmentation':
             fine_tune = True if model_path else False
@@ -197,21 +228,45 @@ class Detection(object):
                    preprocess=True,
                    test_dir='data/personai_icartoonface_detval',
                    model_path='/data/shuai_li/FaceTask/saved_models/detection/resnet50_csv_16.h5',
-                   show=False, write_prediction=True):
+                   show=False, write_prediction=True, gpu_fraction=0.2,test_on_val=False):
+        """
 
-        if directly_train and method == 'retinanet' and self.base.lower() == 'detection':
-            name = model_path.split('/')[-1].replace('.h5', '_predictions.csv')
-            full_name = [method, name]
-            if directly_train:
-                full_name.append('directly-train')
-            if resized:
-                full_name.append('resized-by-myself')
-            if preprocess:
-                full_name.append('preprocessed')
+        :param gpu_id:
+        :param directly_train:
+        :param backbone:
+        :param method:
+        :param resized:
+        :param preprocess:
+        :param test_dir:
+        :param model_path:
+        :param show:
+        :param write_prediction:
+        :param gpu_fraction:
+        :param test_on_val:
+        :return:
+        """
+        name = model_path.split('/')[-1].replace('.h5', '')
+        full_name = [method,name]
+        if directly_train:
+            full_name.append('directly-train')
+        if resized:
+            full_name.append('resized-by-myself')
+        if preprocess:
+            full_name.append('preprocessed')
+        if test_on_val:
+            full_name.append('val-for-mAP-compute')
+
+        setup_gpu(gpu_id)
+        import tensorflow as tf
+        import keras.backend.tensorflow_backend as KTF
+        config = tf.ConfigProto()
+        config.gpu_options.per_process_gpu_memory_fraction = gpu_fraction
+        session = tf.Session(config=config)
+        KTF.set_session(session)
+        res_name = 'predictions/{}.csv'.format('_'.join(full_name))
+        if directly_train and method.lower() == 'retinanet' and self.base.lower() == 'detection':
             if write_prediction:
                 result = open('predictions/{}.csv'.format('_'.join(full_name)), 'w', encoding='utf-8')
-            gpu_id = gpu_id
-            setup_gpu(gpu_id)
             model = models.load_model(model_path, backbone_name=backbone)
             model = models.convert_model(model, nms=True, class_specific_filter=True)
             model.summary()
@@ -259,18 +314,102 @@ class Detection(object):
                     plt.imshow(draw)
                     plt.show()
         elif self.base.lower() == 'segmentation':
-            self.app.predict(
+            res_name = self.app.predict(
                 model_path=model_path,
                 test_img_dir=test_dir,
                 shape=self.resized_shape,
             )
+        elif directly_train and method.lower() == 'efficientdet' and self.base.lower() == 'detection':
+            from libs.EfficientDet.model import efficientdet
+            from libs.EfficientDet.utils import preprocess_image as pre_process, postprocess_boxes
+            from libs.EfficientDet.utils.draw_boxes import draw_boxes
+            if write_prediction:
+                result = open('predictions/{}.csv'.format('_'.join(full_name)), 'w', encoding='utf-8')
+            phi = int(backbone[-1])
+            image_sizes = (512, 640, 768, 896, 1024, 1280, 1408)
+            image_size = image_sizes[phi]
+            classes = {0: 'face'}
+            score_threshold = 0.2
+            _, model = efficientdet(phi=phi,
+                                    weighted_bifpn=False,
+                                    num_classes=1,
+                                    score_threshold=score_threshold)
+            model.load_weights(model_path, by_name=True)
+            for img_name in tqdm.tqdm(os.listdir(test_dir), total=len(os.listdir(test_dir))):
+                img_path = os.path.join(test_dir, img_name)
+                image = cv2.imread(img_path)
+                image = image[:, :, ::-1]
+                src_image = image.copy()
+                h, w = image.shape[:2]
+                if resized:
+                    h_rate = h / self.resized_shape[0]
+                    w_rate = w / self.resized_shape[1]
+                    image = cv2.resize(image, (self.resized_shape[1], self.resized_shape[0]),
+                                       interpolation=cv2.INTER_AREA)
+                    image, scale = pre_process(image, image_size)
+                    boxes, scores, labels = model.predict_on_batch([np.expand_dims(image, axis=0)])
+                    boxes, scores, labels = np.squeeze(boxes), np.squeeze(scores), np.squeeze(labels)
+                    boxes = postprocess_boxes(boxes=boxes, scale=scale, height=h, width=w)
+                    boxes[:, 0] *= w_rate
+                    boxes[:, 2] *= w_rate
+                    boxes[:, 1] *= h_rate
+                    boxes[:, 3] *= h_rate
+                    boxes = boxes.astype(dtype='int8')
+                    indices = np.where(scores[:] > score_threshold)[0]
+                    boxes = boxes[indices]
+                    labels = labels[indices]
+                    if write_prediction:
+                        for b, l, s in zip(boxes, labels, scores):
+                            xmin, ymin, xmax, ymax = list(map(int, b))
+                            result.write('{},{},{},{},{},{},{}\n'.format(
+                                img_name, xmin, ymin, xmax, ymax, 'face', s
+                            ))
+                    if show:
+                        draw_boxes(src_image, boxes, scores, labels, [[255, 0, 0]], classes)
+                        plt.figure(figsize=(15, 15))
+                        plt.axis('off')
+                        plt.imshow(src_image)
+                        plt.show()
+
+                else:
+                    image, scale = pre_process(image, image_size)
+                    boxes, scores, labels = model.predict_on_batch([np.expand_dims(image, axis=0)])
+                    boxes, scores, labels = np.squeeze(boxes), np.squeeze(scores), np.squeeze(labels)
+                    boxes = postprocess_boxes(boxes=boxes, scale=scale, height=h, width=w)
+                    indices = np.where(scores[:] > score_threshold)[0]
+                    boxes = boxes[indices]
+                    labels = labels[indices]
+                    if write_prediction:
+                        for b, l, s in zip(boxes, labels, scores):
+                            xmin, ymin, xmax, ymax = list(map(int, b))
+                            result.write('{},{},{},{},{},{},{}\n'.format(
+                                img_name, xmin, ymin, xmax, ymax, 'face', s
+                            ))
+                    if show:
+                        draw_boxes(src_image, boxes, scores, labels, [[255, 0, 0]], classes)
+                        plt.figure(figsize=(15, 15))
+                        plt.axis('off')
+                        plt.imshow(src_image)
+                        plt.show()
+
+        return res_name
+
+    def compute_mAP_on_val_data(self,
+                                gpu_id=0, directly_train=True,
+                                backbone='resnet50',method='retinanet',
+                                resized=True,preprocess=True,
+                                model_path='/data/shuai_li/FaceTask/saved_models/detection/resnet50_csv_16.h5',
+                                show=False, write_prediction=True, gpu_fraction=0.2):
+        pass
 
 
 if __name__ == '__main__':
     # (240,360) (480,720) (512,768) (720,1080) multi-scale training
     app = Detection(img_dir='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain/icartoonface_dettrain',
                     label_csv_path='/data/shuai_li/FaceTask/data/personai_icartoonface_dettrain_anno_updatedv1.0.csv',
-                    batch_size=10,resized_shape=(240,360),base='detection')
-    app.train_model(gpu=0,directly_train=True,method='efficientdet',backbone='b2',
-                    model_path=None,augmentation=False,gpu_fraction=0.2)#the last ms, use augmentation
-    # app.prediction(preprocess=True,resized=False,show=False,write_prediction=True)
+                    batch_size=10, resized_shape=(240, 360), base='detection')
+    # app.train_model(gpu=3, directly_train=True, method='retinanet', backbone='resnet152',
+    #                 model_path=None, augmentation=True, gpu_fraction=0.1)  # the last ms, use augmentation
+    app.prediction(preprocess=True,resized=False,show=False,write_prediction=True,backbone='b0',method='efficientdet',gpu_id=0,
+                   gpu_fraction=0.2,
+                   model_path='/data/shuai_li/FaceTask/saved_models/detection/efficientdet_b0_csv_240x360_0011_0.62161.h5')

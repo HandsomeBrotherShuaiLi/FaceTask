@@ -296,6 +296,7 @@ def efficientdet_train(args,train_steps=None,val_steps=None):
     print('*'*100)
     print(args)
     print('*'*100)
+
     def make_sure_only_save_best():
         dir = args.snapshot_path
         scores = {}

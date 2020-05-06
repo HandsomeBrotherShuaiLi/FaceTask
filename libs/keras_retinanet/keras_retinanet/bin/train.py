@@ -197,7 +197,7 @@ def create_callbacks(model, training_model, prediction_model, validation_generat
     callbacks.append(keras.callbacks.ReduceLROnPlateau(
         monitor    = 'val_loss',
         factor     = 0.1,
-        patience   = 4,
+        patience   = 2,
         verbose    = 1,
         mode       = 'min',
         min_delta  = 0.0001,
@@ -209,7 +209,7 @@ def create_callbacks(model, training_model, prediction_model, validation_generat
         monitor='val_loss',
         mode='min',
         verbose=1,
-        patience=26,
+        patience=11,
     ))
 
     if args.tensorboard_dir:

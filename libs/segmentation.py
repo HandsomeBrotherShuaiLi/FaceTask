@@ -220,6 +220,7 @@ class Segmentation(object):
                     img_name,xmin,ymin,xmax,ymax,'face',0.90
                 ))
         result.close()
+        return 'predictions/{}'.format(name)
 
 
 if __name__=='__main__':
