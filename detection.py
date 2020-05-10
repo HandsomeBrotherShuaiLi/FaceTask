@@ -13,6 +13,7 @@ from libs.keras_retinanet.keras_retinanet import models
 from libs.keras_retinanet.keras_retinanet.utils.image import preprocess_image, resize_image
 from libs.keras_retinanet.keras_retinanet.utils.visualization import draw_box, draw_caption
 from libs.keras_retinanet.keras_retinanet.utils.gpu import setup_gpu
+from libs.yolo3.train import yolo_det
 from libs.keras_retinanet.keras_retinanet.utils.colors import label_color
 from libs.EfficientDet.train import efficientdet_train, efficientdet_parse_args
 from libs.segmentation import Segmentation
@@ -21,7 +22,7 @@ import matplotlib.pyplot as plt
 
 class Detection(object):
     def __init__(self, img_dir, label_csv_path, split_rate=0.2, batch_size=32,
-                 resized_shape=(480, 720), base='detection'):
+                 resized_shape=(480, 720), base='detection',yolo=False):
         """
 
         :param img_dir:
@@ -35,12 +36,16 @@ class Detection(object):
         self.resized_shape = resized_shape
         self.label_csv_path = label_csv_path
         self.base = base
+        self.yolo=yolo
         if base.lower() == 'detection':
-            self.split_rate = split_rate
-            self.batch_size = batch_size
-            self.train_path, self.val_path, self.cls_path = self.process()
-            self.train_steps = len(open(self.train_path, 'r', encoding='utf-8').readlines()) // batch_size
-            self.val_steps = len(open(self.val_path, 'r', encoding='utf-8').readlines()) // batch_size
+            if not yolo:
+                self.split_rate = split_rate
+                self.batch_size = batch_size
+                self.train_path, self.val_path, self.cls_path = self.process()
+                self.train_steps = len(open(self.train_path, 'r', encoding='utf-8').readlines()) // batch_size
+                self.val_steps = len(open(self.val_path, 'r', encoding='utf-8').readlines()) // batch_size
+            else:
+                self.app=yolo_det()
         elif base.lower() == 'segmentation':
             self.app = Segmentation(img_dir=self.img_dir,
                                     label_csv_path=self.label_csv_path,
@@ -122,7 +127,7 @@ class Detection(object):
         config.gpu_options.per_process_gpu_memory_fraction = gpu_fraction
         session = tf.Session(config=config)
         KTF.set_session(session)
-        if method.lower() == 'retinanet' and directly_train and self.base.lower() == 'detection':
+        if method.lower() == 'retinanet' and directly_train and self.base.lower() == 'detection' and not self.yolo:
             args = parse_args()
             args.dataset_type = 'csv'
             args.batch_size = self.batch_size
@@ -165,7 +170,7 @@ class Detection(object):
                 args.snapshot = model_path
                 detection_main(args, train_steps=self.train_steps, val_steps=self.val_steps)
 
-        elif method.lower() == 'efficientdet' and directly_train and self.base.lower() == 'detection':
+        elif method.lower() == 'efficientdet' and directly_train and self.base.lower() == 'detection' and not self.yolo:
 
             args = efficientdet_parse_args()
             args.dataset_type = 'csv'
@@ -218,6 +223,9 @@ class Detection(object):
             self.app.train(model_name=method, backbone=backbone,
                            fine_tune=fine_tune, model_path=model_path,
                            opt='adam', lr=1e-3, shape=self.resized_shape)
+
+        elif self.yolo:
+            self.app.train_yolov3(gpu_id=1)
 
     def prediction(self,
                    gpu_id=0,
